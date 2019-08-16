@@ -1,0 +1,99 @@
+###
+#
+# Copyright 2019 Crunchy Data Solutions, Inc. All Rights Reserved.
+#
+###
+
+---
+all:
+  vars:
+    host_key_checking: false
+    cluster_name: crunchy
+    postgresql_version: "11"
+    postgresql_pgdatabase: testdb
+    postgresql_pguser: testuser
+    postgresql_pgpassword: test123
+    postgresql_pghost: 192.168.122.14
+    postgresql_pgport: 5432
+    postgresql_replication_pguser: replicator
+    postgresql_replication_pgpassword: repli@cator#passwd
+    postgresql_super_pguser: postgres
+    postgresql_super_pgpassword: pg@super#passwd
+    postgresql_home: /var/lib/pgsql
+    postgresql_pgdata: '{{ postgresql_home }}/{{ postgresql_major_version }}/data'
+    etcd_listen_client_port: 2379
+    etcd_cluster_group : "{{ groups['patroni_cluster'] + groups['common_server'] }}"
+    node_cluster_group: "{{ groups['common_server'] + groups['patroni_cluster'] }}"
+    pg_cluster_group: "{{ groups['patroni_cluster'] }}"
+    node_exporter_port: 9100
+
+    backrest_cluster_group: "{{ groups['common_server'] }}"
+
+  children:
+  
+    patroni_cluster:
+      hosts:
+        192.168.122.16:
+          etcd_name: etcd1
+          patroni_name: pg1
+        192.168.122.26:
+          etcd_name: etcd2
+          patroni_name: pg2
+      vars:
+        etcd_jobname: "{{ etcd_name }}"
+        deploy_node_exporter: true
+        deploy_global_pg_exporter: true
+        deploy_user_pg_exporter: true
+        node_jobname: "{{ patroni_name }}"
+        pg_exporters:
+        - crunchy:
+          - postgres: 9187
+          - testdb: 9188
+        postgresql_pgport: 25432
+        patroni_port: 8009
+        backrest_role: client
+        pgmonitor_password: postgres123
+        postgresql_spool: '{{ postgresql_home }}/{{ postgresql_major_version }}/spool'
+        bloat_cron_enabled: true
+        bloat_cron_weekday: "1"
+        bloat_cron_hour: "4"
+        bloat_cron_minute: "30"
+        pg_jobname: "{{ patroni_name }}"
+        pg_exporter_port: 9188
+        patroni_postgresql_user_parameters:
+          pgaudit.log: "read, write"
+          checkpoint_completion_target: "0.9"
+          hot_standby: "on"
+          hot_standby_feedback: "on"
+          random_page_cost: "2.0"
+          log_min_duration_statement: "500"
+          log_line_prefix: "%t [%p]: [%l-1], %u, %d "
+          log_checkpoints: "on"
+          log_connections: "on"
+          log_disconnections: "on"
+          log_lock_waits: "on"
+          log_temp_files: "0"
+          log_autovacuum_min_duration: "0"
+        postgresql_extensions:
+          - { name: pgaudit, package_name: "pgaudit{{ postgresql_major_version_nodots }}", preload: true }
+          - { name: pg_stat_statements, package_name: '', preload: true }
+
+    common_server:
+      hosts:
+        192.168.122.14:
+          etcd_name: etcd3
+      vars:
+        node_jobname: "Common Node"
+        etcd_jobname: "{{ etcd_name }}"
+        deploy_node_exporter: true
+        deploy_global_pg_exporter: false
+        deploy_user_pg_exporter: false
+        deploy_haproxy_exporter: false
+        deploy_pgbouncer_exporter: false
+        backrest_role: server
+        cluster_group: '{{ groups[''patroni_cluster''] }}'
+        listen_primary_port: 15432
+        listen_replica_port: 15433
+        databases:
+          - { dbalias: "{{postgresql_pgdatabase}}",    host: "{{ postgresql_pghost }}", dbname: "{{postgresql_pgdatabase}}", port: "{{ listen_primary_port }}", auth_user: "{{ pgb_username }}" }
+          - { dbalias: "{{postgresql_pgdatabase}}ro",  host: "{{ postgresql_pghost }}", dbname: "{{postgresql_pgdatabase}}", port: "{{ listen_replica_port }}", auth_user: "{{ pgb_username }}" }
