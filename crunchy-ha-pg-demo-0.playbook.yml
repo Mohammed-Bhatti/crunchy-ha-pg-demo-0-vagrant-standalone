@@ -1,0 +1,38 @@
+### 
+#
+# Copyright 2019 Crunchy Data Solutions, Inc. All Rights Reserved. 
+#
+###
+
+---
+- hosts: patroni_cluster:common_server
+  become: yes
+  roles:
+    - { role: crunchydata/etcd }
+
+- hosts: patroni_cluster
+  become: yes
+  serial:
+  - 1
+  - "100%"
+  roles:
+    - { role: crunchydata/crunchyrepo }
+    - { role: crunchydata/postgresql, pg_setup: false, pg_cluster: false }
+    - { role: crunchydata/backrest }
+    - { role: crunchydata/patroni }
+    - { role: crunchydata/postgresql, pg_setup: false, pg_install: false }
+    - { role: crunchydata/pgmonitor, firewall_ports: ["9100/tcp","9187/tcp","9188/tcp"] }
+
+- hosts: common_server
+  become: yes
+  roles:
+    - { role: crunchydata/crunchyrepo }
+    - { role: crunchydata/backrest, postgresql_pgport: 25432 }
+    - { role: crunchydata/pgbackup }
+    - { role: crunchydata/haproxy, postgresql_pgport: 25432 }
+    - { role: crunchydata/pgbouncer, postgresql_pgport: 15432, listen_port: 5432 }
+    - { role: crunchydata/prometheus }
+    - { role: crunchydata/grafana }
+    - { role: crunchydata/pgmonitor }
+    - { role: crunchydata/pgbench, become: no, initialize: 1 }
+    - { role: crunchydata/pgbench, become: no, initialize: 0}
