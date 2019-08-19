@@ -18,7 +18,9 @@ From the the priv-all-ansible-roles, copy the roles directory to the local direc
 We will use virsh as the driver
 
 The directory structure is shown as follows:
-crunchy-ha-pg-demo-0-vagrant-standalone
+
+crunchy-ha-pg-demo-0-vagrant-standalone/
+
     crunchy-ha-pg-demo-0.playbook.yml
     hosts/
     roles/
